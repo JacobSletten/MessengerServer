@@ -3,7 +3,7 @@ import java.net.ServerSocket;
 import java.net.Socket;
 
 public class Server {
-    private ServerSocket serverSocket;
+    private final ServerSocket serverSocket;
 
     public Server(ServerSocket serverSocket) {
         this.serverSocket = serverSocket;
@@ -15,7 +15,7 @@ public class Server {
             while(!serverSocket.isClosed()) {
                 Socket socket = serverSocket.accept(); // Wait for a new connection
                 System.out.println("A new client has connected!");
-                // pass the connection to the ServerTransceiver
+                // pass the connection to a ServerTransceiver
                 ServerTransceiver serverTransceiver = new ServerTransceiver(socket);
                 //Create a new thread to independently handle this connection:
                 Thread thread = new Thread(serverTransceiver);

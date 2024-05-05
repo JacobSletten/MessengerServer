@@ -3,13 +3,13 @@ import java.net.Socket;
 import java.util.ArrayList;
 
 public class ServerTransceiver implements Runnable {
-
+    // Shared list of connections
     public static ArrayList<ServerTransceiver> connections = new ArrayList<>();
     private Socket socket; //client socket
     private BufferedReader bufferedReader; // Used to read from the socket
     private BufferedWriter bufferedWriter; // Used to write to the socket
     private String clientUsername;
-    public static DataAccessObject dao = new DataAccessObject();
+    public static DataAccessObject dao = new DataAccessObject(); // Used to access the database
 
     public ServerTransceiver(Socket socket) {
         try  {
@@ -17,28 +17,31 @@ public class ServerTransceiver implements Runnable {
             this.bufferedWriter = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
             this.bufferedReader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
         } catch (IOException e) {
-            System.out.println("ServerTransceiver IOExeption");
+            System.out.println("ServerTransceiver IOException");
             closeEverything(socket, bufferedReader, bufferedWriter);
         }
     }
 
+    // Write a message to every active connection managed by a ServerTransceiver
     public void broadcastMessage(String message) {
         for (ServerTransceiver connection: connections) {
             try {
-                connection.bufferedWriter.write(message);
-                connection.bufferedWriter.newLine();
-                connection.bufferedWriter.flush();
+                connection.flushMessage(message);
             } catch (IOException e) {
                 e.printStackTrace();
             }
         }
     }
 
+    // Removes this particular connection from the shared list
+    // of connections before letting all connections know who has left.
     public void removeConnection() {
         connections.remove(this);
         broadcastMessage("SERVER: " + clientUsername + " has left the chat!");
     }
 
+    // Removes this ServerTransceiver from the shared list of connections;
+    // Shuts down the client socket, buffered writer, and buffered reader.
     public void closeEverything(
             Socket socket,
             BufferedReader bufferedReader,
@@ -65,11 +68,12 @@ public class ServerTransceiver implements Runnable {
             String user = bufferedReader.readLine();
             String pass = bufferedReader.readLine();
             System.out.println("User:" + user);
-            String validation = dao.validateUser(user, pass);
-            if (validation.equals("Valid")) {
+            EventFlag validation = dao.validateUser(user, pass);
+            if (validation.equals(EventFlag.VALID)) {
                 acknowledgeCredentials(user);
             } else {
-                sendErrorMessage(validation);
+                // Just send the error message
+                flushMessage(String.valueOf(validation.ordinal()));
             }
         } catch (IOException e) {
             e.printStackTrace();
@@ -80,11 +84,12 @@ public class ServerTransceiver implements Runnable {
         try {
             String user = bufferedReader.readLine();
             String pass = bufferedReader.readLine();
-            String validation = dao.createUser(user,pass);
-            if (validation.equals("Valid")) {
+            EventFlag validation = dao.createUser(user,pass);
+            if (validation.equals(EventFlag.VALID)) {
                 acknowledgeCredentials(user);
             } else {
-                sendErrorMessage(validation);
+                //Just send the error message.
+                flushMessage(String.valueOf(validation.ordinal()));
             }
         } catch (IOException e) {
             e.printStackTrace();
@@ -93,17 +98,23 @@ public class ServerTransceiver implements Runnable {
 
     public void acknowledgeCredentials(String user) throws IOException {
         clientUsername = user;
-        bufferedWriter.write("Valid Login");
-        bufferedWriter.newLine();
-        bufferedWriter.flush();
+        flushMessage(String.valueOf(EventFlag.VALID.ordinal()));
         connections.add(this);
         broadcastMessage("SERVER: " + clientUsername + " had entered the chat!");
     }
 
-    public void sendErrorMessage(String message) throws IOException {
+    private void flushMessage(String message) throws IOException {
         bufferedWriter.write(message);
         bufferedWriter.newLine();
         bufferedWriter.flush();
+    }
+
+    public static int parseStringToOrdinal(String stringToParse) {
+        try {
+            return Integer.parseInt(stringToParse);
+        } catch(NumberFormatException e) {
+            return 0; // 0 == INVALID
+        }
     }
 
     @Override
@@ -111,14 +122,13 @@ public class ServerTransceiver implements Runnable {
         String messageFromClient;
         while(socket.isConnected()) {
             try { //BLOCKING OPERATION
-                messageFromClient= bufferedReader.readLine();
+                messageFromClient = bufferedReader.readLine();
+                EventFlag event = EventFlag.values()[parseStringToOrdinal(messageFromClient)];
                 System.out.println("Received: " + messageFromClient);
-                if (messageFromClient.equals("Login")) {
-                    manageLogin();
-                } else if (messageFromClient.equals("Create") ) {
-                    manageAccountCreation();
-                } else {
-                    broadcastMessage(messageFromClient);
+                switch (event) {
+                    case LOGIN -> manageLogin();
+                    case CREATE_ACCOUNT -> manageAccountCreation();
+                    default -> broadcastMessage(messageFromClient);
                 }
             } catch (IOException e) {
                 closeEverything(socket, bufferedReader, bufferedWriter);

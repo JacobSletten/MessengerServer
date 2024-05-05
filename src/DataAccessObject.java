@@ -1,5 +1,9 @@
 import java.sql.*;
 
+/**
+ * This class provides access to a local MySQL server.
+ * Specifically, it can be used to Create a User and Validate a User.
+ */
 public class DataAccessObject {
     Connection connection;
     PreparedStatement psGetUser;
@@ -20,66 +24,54 @@ public class DataAccessObject {
         }
     }
 
-    /*public void getUsers() {
-        try {
-            ResultSet results = psGetAllUsers.executeQuery();
-            while (results.next()) {
-                System.out.println(results.getString("username"));
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-    }*/ //getUsers()
-
-    public String createUser(String user, String pass) {
+    public EventFlag createUser(String user, String pass) {
         ResultSet results;
         try {
             psGetUser.setString(1, user);
             results = psGetUser.executeQuery();
             if (results.isBeforeFirst()) { //User already exists
                 System.out.println("User already exists");
-                return "User Already Exists";
+                return EventFlag.USER_ALREADY_EXISTS;
             }
             if (!validatePassword(pass)) { // Password is invalid
                 System.out.println("Invalid Password");
-                return "Invalid Password";
+                return EventFlag.INVALID_PASSWORD;
             }
             psInsert.setString(1,user);
             psInsert.setString(2,pass);
             psInsert.executeUpdate();
             System.out.println("User Inserted");
-            return "Valid";
+            return EventFlag.VALID;
 
         } catch (SQLException e) {
             e.printStackTrace();
-            return "Invalid";
+            return EventFlag.INVALID;
         }
     }
 
-    public String validateUser(String user,String pass) {
+    public EventFlag validateUser(String user,String pass) {
         ResultSet results;
         String password;
         try {
             psGetUser.setString(1,user);
             results = psGetUser.executeQuery();
 
-            if(!results.isBeforeFirst()) { // Username doesnt exist
+            if(!results.isBeforeFirst()) { // Username doesn't exist
                 System.out.println("This username (" + user + ") does not exist");
-                return "Invalid Username";
+                return EventFlag.USER_DOES_NOT_EXIST ;
             }
             results.next(); // Get Password
             password = results.getString("password");
             if (!password.equals(pass)) { //Incorrect Password
                 System.out.println("Incorrect Password");
-                return "Incorrect Password";
+                return EventFlag.INVALID_PASSWORD;
             }
-            return "Valid";
+            return EventFlag.VALID;
         } catch (SQLException e) {
             e.printStackTrace();
-            return "Invalid";
+            return EventFlag.INVALID;
         }
     }
-
     private boolean validatePassword(String pass) {
         return ((pass != null) && (pass.length() >= 4));
     }
