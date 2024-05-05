@@ -5,7 +5,8 @@ public enum EventFlag {
     USER_DOES_NOT_EXIST("Username Does Not Exist"),
     INVALID_PASSWORD("Invalid Password"),
     LOGIN(null),
-    CREATE_ACCOUNT(null);
+    CREATE_ACCOUNT(null),
+    SHUTDOWN(null);
 
     private final String message;
     public String getMessage() {

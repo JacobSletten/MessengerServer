@@ -8,7 +8,7 @@ public class ServerTransceiver implements Runnable {
     private Socket socket; //client socket
     private BufferedReader bufferedReader; // Used to read from the socket
     private BufferedWriter bufferedWriter; // Used to write to the socket
-    private String clientUsername;
+    private String clientUsername = "Unauthenticated";
     public static DataAccessObject dao = new DataAccessObject(); // Used to access the database
 
     public ServerTransceiver(Socket socket) {
@@ -18,7 +18,7 @@ public class ServerTransceiver implements Runnable {
             this.bufferedReader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
         } catch (IOException e) {
             System.out.println("ServerTransceiver IOException");
-            closeEverything(socket, bufferedReader, bufferedWriter);
+            closeEverything();
         }
     }
 
@@ -37,16 +37,16 @@ public class ServerTransceiver implements Runnable {
     // of connections before letting all connections know who has left.
     public void removeConnection() {
         connections.remove(this);
-        broadcastMessage("SERVER: " + clientUsername + " has left the chat!");
+        System.out.println("SERVER: " + clientUsername + " has left the chat!");
+        System.out.println("Remaining Connections: " + printConnections());
+        if (!this.clientUsername.equals("Unauthenticated")) {
+            broadcastMessage("SERVER: " + clientUsername + " has left the chat!");
+        }
     }
 
     // Removes this ServerTransceiver from the shared list of connections;
     // Shuts down the client socket, buffered writer, and buffered reader.
-    public void closeEverything(
-            Socket socket,
-            BufferedReader bufferedReader,
-            BufferedWriter bufferedWriter
-    ) {
+    public void closeEverything() {
         removeConnection();
         try {
             if (bufferedReader != null) {
@@ -100,6 +100,7 @@ public class ServerTransceiver implements Runnable {
         clientUsername = user;
         flushMessage(String.valueOf(EventFlag.VALID.ordinal()));
         connections.add(this);
+        System.out.println(printConnections());
         broadcastMessage("SERVER: " + clientUsername + " had entered the chat!");
     }
 
@@ -109,7 +110,7 @@ public class ServerTransceiver implements Runnable {
         bufferedWriter.flush();
     }
 
-    public static int parseStringToOrdinal(String stringToParse) {
+    private static int parseStringToOrdinal(String stringToParse) {
         try {
             return Integer.parseInt(stringToParse);
         } catch(NumberFormatException e) {
@@ -117,21 +118,34 @@ public class ServerTransceiver implements Runnable {
         }
     }
 
+    private static String printConnections() {
+        String output = "[";
+        for (ServerTransceiver connection: connections) {
+            output = output.concat(connection.clientUsername + ",");
+        }
+        output = output.substring(0,output.length() - 1).concat("]");
+        return output;
+    }
+
     @Override
     public void run() {
         String messageFromClient;
-        while(socket.isConnected()) {
+        while(!socket.isClosed()) {
             try { //BLOCKING OPERATION
                 messageFromClient = bufferedReader.readLine();
+                if (messageFromClient == null) {
+                    socket.close();
+                }
                 EventFlag event = EventFlag.values()[parseStringToOrdinal(messageFromClient)];
                 System.out.println("Received: " + messageFromClient);
                 switch (event) {
                     case LOGIN -> manageLogin();
                     case CREATE_ACCOUNT -> manageAccountCreation();
+                    case SHUTDOWN -> closeEverything();
                     default -> broadcastMessage(messageFromClient);
                 }
             } catch (IOException e) {
-                closeEverything(socket, bufferedReader, bufferedWriter);
+                closeEverything();
                 break;
             }
         }
