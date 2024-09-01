@@ -72,7 +72,7 @@ public class ServerTransceiver implements Runnable {
             if (validation.equals(EventFlag.VALID)) {
                 acknowledgeCredentials(user);
             } else {
-                // Just send the error message
+                // Just send the error flag.
                 flushMessage(String.valueOf(validation.ordinal()));
             }
         } catch (IOException e) {
@@ -88,7 +88,7 @@ public class ServerTransceiver implements Runnable {
             if (validation.equals(EventFlag.VALID)) {
                 acknowledgeCredentials(user);
             } else {
-                //Just send the error message.
+                //Just send the error flag.
                 flushMessage(String.valueOf(validation.ordinal()));
             }
         } catch (IOException e) {
@@ -114,7 +114,7 @@ public class ServerTransceiver implements Runnable {
         try {
             return Integer.parseInt(stringToParse);
         } catch(NumberFormatException e) {
-            return 0; // 0 == INVALID
+            return 0; // 0 == EventFlag.INVALID
         }
     }
 
@@ -133,9 +133,6 @@ public class ServerTransceiver implements Runnable {
         while(!socket.isClosed()) {
             try { //BLOCKING OPERATION
                 messageFromClient = bufferedReader.readLine();
-                if (messageFromClient == null) {
-                    socket.close();
-                }
                 EventFlag event = EventFlag.values()[parseStringToOrdinal(messageFromClient)];
                 System.out.println("Received: " + messageFromClient);
                 switch (event) {
